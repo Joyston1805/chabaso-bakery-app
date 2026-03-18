@@ -16,38 +16,36 @@ os.makedirs(IMAGE_FOLDER, exist_ok=True)
 st.markdown("""
 <style>
 .main-header {color: #8B4513; font-size: 3rem; font-weight: bold;}
-.metric-card {background: linear-gradient(135deg, #F4A261 0%, #E76F51 100%); padding: 1rem; border-radius: 10px;}
-.stButton > button {background: linear-gradient(45deg, #FF6B6B, #4ECDC4); border: none; color: white; border-radius: 25px;}
 </style>
 """, unsafe_allow_html=True)
 
-# ------------------ IMAGE MATCHING ------------------
+# ------------------ IMAGE MATCH ------------------
 def get_image_path(product_desc):
     if not product_desc:
         return None
 
-    # Prioritize JPG since your files are JPG
     for ext in ["jpg", "jpeg", "png"]:
         path = os.path.join(IMAGE_FOLDER, f"{product_desc}.{ext}")
         if os.path.exists(path):
             return path
-
     return None
 
-# ------------------ DATA ------------------
+# ------------------ LOAD DATA ------------------
 @st.cache_data
 def load_data():
-    if os.path.exists("DOUGH-PROD.xlsx"):
-        return pd.read_excel("DOUGH-PROD.xlsx")
-    else:
-        return pd.DataFrame(columns=[
-            "product_code","product_desc","dough_code",
-            "weight_g","status","category",
-            "ingredients","bake_time","shelf_life"
-        ])
+    if not os.path.exists("DOUGH-PROD.xlsx"):
+        return pd.DataFrame()
+
+    df = pd.read_excel("DOUGH-PROD.xlsx", sheet_name="ML")
+
+    # Clean column names (strip spaces)
+    df.columns = df.columns.str.strip()
+
+    return df
 
 def save_data(df):
-    df.to_excel("DOUGH-PROD.xlsx", index=False)
+    with pd.ExcelWriter("DOUGH-PROD.xlsx", engine="openpyxl", mode="w") as writer:
+        df.to_excel(writer, sheet_name="ML", index=False)
 
 df = load_data()
 
@@ -63,15 +61,22 @@ page = st.sidebar.selectbox("Navigate", [
 
 # ------------------ DASHBOARD ------------------
 if page == "📊 Dashboard":
-    st.header("📊 Bakery Dashboard")
+    st.header("📊 Dashboard")
 
     col1, col2, col3 = st.columns(3)
 
     col1.metric("Total Products", len(df))
-    col2.metric("Active Products", len(df[df['status'] == 'Active']))
-    col3.metric("Total Weight (g)", int(df['weight_g'].sum()) if not df.empty else 0)
+    
+    if "Prod_Status" in df.columns:
+        col2.metric("Active Products", len(df[df["Prod_Status"] == "Active"]))
+    else:
+        col2.metric("Active Products", "N/A")
 
-    st.subheader("All Products")
+    if "cutwt_per_pc_g" in df.columns:
+        col3.metric("Avg Weight (g)", round(df["cutwt_per_pc_g"].mean(), 2))
+    else:
+        col3.metric("Avg Weight", "N/A")
+
     st.dataframe(df, use_container_width=True)
 
 # ------------------ LOOKUP ------------------
@@ -80,10 +85,10 @@ elif page == "🔍 Product Lookup":
 
     search = st.text_input("Search by Product Code or Dough Code")
 
-    if search:
+    if search and not df.empty:
         results = df[
-            df['product_code'].astype(str).str.contains(search, case=False, na=False) |
-            df['dough_code'].astype(str).str.contains(search, case=False, na=False)
+            df["product_code"].astype(str).str.contains(search, case=False, na=False) |
+            df["dough_code"].astype(str).str.contains(search, case=False, na=False)
         ]
 
         if not results.empty:
@@ -91,80 +96,52 @@ elif page == "🔍 Product Lookup":
                 col1, col2 = st.columns([2,1])
 
                 with col1:
-                    st.subheader(row['product_desc'])
-                    st.write(f"**Product Code:** {row['product_code']}")
-                    st.write(f"**Dough Code:** {row['dough_code']}")
-                    st.write(f"**Weight:** {row['weight_g']} g")
-                    st.write(f"**Status:** {row['status']}")
-                    st.write(f"**Ingredients:** {row.get('ingredients','')}")
-                    st.write(f"**Bake Time:** {row.get('bake_time','')}")
-                    st.write(f"**Shelf Life:** {row.get('shelf_life','')}")
+                    st.subheader(row.get("product_desc", "N/A"))
+
+                    for col in df.columns:
+                        val = row[col]
+                        if pd.notna(val) and str(val).strip() != "":
+                            st.write(f"**{col}:** {val}")
 
                 with col2:
-                    img = get_image_path(row['product_desc'])
+                    img = get_image_path(row.get("product_desc"))
                     if img:
                         st.image(img, use_container_width=True)
                     else:
                         st.info("No image found")
 
         else:
-            st.warning("❌ No products found")
+            st.warning("❌ No match found")
 
 # ------------------ ADD PRODUCT ------------------
 elif page == "➕ Add Product":
     st.header("➕ Add Product")
 
     with st.form("form"):
-        col1, col2 = st.columns(2)
+        inputs = {}
 
-        with col1:
-            product_code = st.text_input("Product Code *")
-            product_desc = st.text_input("Product Name *")
-            dough_code = st.text_input("Dough Code")
-
-        with col2:
-            weight_g = st.number_input("Weight (g)", value=85.0)
-            status = st.selectbox("Status", ["Active","Inactive","Test"])
-            category = st.selectbox("Category", ["Ciabatta","Baguette","Rolls","Other"])
-
-        ingredients = st.text_area("Ingredients")
-        bake_time = st.text_input("Bake Time")
-        shelf_life = st.text_input("Shelf Life")
+        for col in df.columns:
+            inputs[col] = st.text_input(col)
 
         photo = st.file_uploader("Upload Product Image", type=["jpg","jpeg","png"])
 
         submit = st.form_submit_button("Add Product")
 
         if submit:
-            if not product_code or not product_desc:
-                st.error("Product Code and Product Name are required!")
-            else:
-                # Save image using exact product name
-                if photo:
-                    file_ext = photo.name.split('.')[-1].lower()
+            new_row = pd.DataFrame([inputs])
 
-                    # Normalize extension
-                    if file_ext == "jpeg":
-                        file_ext = "jpg"
+            # Save image
+            if photo and inputs.get("product_desc"):
+                ext = photo.name.split('.')[-1].lower()
+                if ext == "jpeg":
+                    ext = "jpg"
 
-                    filepath = os.path.join(IMAGE_FOLDER, f"{product_desc}.{file_ext}")
+                filepath = os.path.join(IMAGE_FOLDER, f"{inputs['product_desc']}.{ext}")
 
-                    with open(filepath, "wb") as f:
-                        f.write(photo.getbuffer())
+                with open(filepath, "wb") as f:
+                    f.write(photo.getbuffer())
 
-                new_row = pd.DataFrame([{
-                    "product_code": product_code,
-                    "product_desc": product_desc,
-                    "dough_code": dough_code,
-                    "weight_g": weight_g,
-                    "status": status,
-                    "category": category,
-                    "ingredients": ingredients,
-                    "bake_time": bake_time,
-                    "shelf_life": shelf_life
-                }])
+            updated_df = pd.concat([df, new_row], ignore_index=True)
+            save_data(updated_df)
 
-                df_updated = pd.concat([df, new_row], ignore_index=True)
-                save_data(df_updated)
-
-                st.success("✅ Product added successfully!")
+            st.success("✅ Product added successfully!")
