@@ -9,7 +9,7 @@ st.set_page_config(
     page_icon="🍞"
 )
 
-IMAGE_FOLDER = "images"
+IMAGE_FOLDER = "Product Photos"
 os.makedirs(IMAGE_FOLDER, exist_ok=True)
 
 # ------------------ STYLING ------------------
