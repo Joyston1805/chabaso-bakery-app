@@ -23,10 +23,13 @@ st.markdown("""
 def get_image_path(product_desc):
     if not product_desc:
         return None
-    for ext in ["jpg", "jpeg", "png"]:
-        path = os.path.join(IMAGE_FOLDER, f"{product_desc}.{ext}")
-        if os.path.exists(path):
-            return path
+    
+    # Clean product_desc to match exact filename
+    filename = product_desc.strip() + ".jpg"  # Your images are JPG
+    path = os.path.join(IMAGE_FOLDER, filename)
+    
+    if os.path.exists(path):
+        return path
     return None
 
 # ------------------ SAFE SAVE DATA ------------------
@@ -135,12 +138,13 @@ elif page == "🔍 Product Lookup":
                             display_val = str(val) if pd.api.types.is_numeric_dtype(row[col]) else val
                             st.write(f"**{col}:** {display_val}")
                 
-                with col2:
-                    img = get_image_path(row.get("product_desc"))
-                    if img and os.path.exists(img):
-                        st.image(img, use_container_width=True)
-                    else:
-                        st.info("🖼️ No image")
+               with col2:
+    img = get_image_path(row.get("product_desc"))
+    if img and os.path.exists(img):
+        st.image(img, use_container_width=True)
+    else:
+        st.info("🖼️ No image found")
+
         else:
             st.warning("❌ No products match your search")
     elif df.empty:
