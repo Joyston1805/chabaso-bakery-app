@@ -32,29 +32,46 @@ def get_image_path(product_desc):
 
 # ------------------ LOAD DATA -----------------
 
-@st.cache_data
-def load_data():
-    # DEBUG: Show current directory
+def load_data():  # NO CACHE - we need to see debug!
+    st.write("🔍 **DEBUG: Checking files...**")
+    
+    # Show current directory
     current_dir = os.getcwd()
-    st.write(f"📁 Current directory: `{current_dir}`")
+    st.write(f"📁 **Current directory:** `{current_dir}`")
     
-    # DEBUG: List ALL files
+    # List ALL files in repo root
     all_files = os.listdir('.')
-    st.write("📋 All files in repo root:")
-    for f in all_files:
-        st.write(f"  - {f}")
+    st.write("📋 **ALL FILES FOUND:**")
+    for f in sorted(all_files):  # Sorted for consistency
+        file_size = os.path.getsize(f) / 1024  # KB
+        st.write(f"  - **{f}** ({file_size:.1f} KB)")
     
-    # Check specific file
-    file_exists = os.path.exists("DOUGH-PROD.xlsx")
-    st.write(f"✅ DOUGH-PROD.xlsx exists: {file_exists}")
+    # Check Excel specifically
+    excel_path = "DOUGH-PROD.xlsx"
+    file_exists = os.path.exists(excel_path)
+    st.write(f"✅ **DOUGH-PROD.xlsx exists:** {file_exists}")
+    
+    if file_exists:
+        file_size = os.path.getsize(excel_path) / 1024
+        st.write(f"📊 **File size:** {file_size:.1f} KB")
     
     if not file_exists:
-        st.error("❌ File missing! Check GitHub repo structure.")
+        st.error("❌ DOUGH-PROD.xlsx MISSING!")
+        st.info("💡 Push it to GitHub repo root (same level as app.py)")
         return pd.DataFrame()
     
-    df = pd.read_excel("DOUGH-PROD.xlsx", sheet_name="ML")
-    st.success(f"✅ Loaded {len(df)} rows!")
-    return df
+    try:
+        st.info("📖 Reading Excel...")
+        df = pd.read_excel("DOUGH-PROD.xlsx", sheet_name="ML")
+        df.columns = df.columns.str.strip()
+        st.success(f"✅ **LOADED {len(df)} ROWS** from {len(df.columns)} columns!")
+        st.write("**First 3 rows:**")
+        st.dataframe(df.head(3))
+        return df
+    except Exception as e:
+        st.error(f"❌ **Excel Error:** {str(e)}")
+        st.write("**Column names found:**", list(df.columns) if 'df' in locals() else "None")
+        return pd.DataFrame()
 
 
 # ------------------ HEADER ------------------
