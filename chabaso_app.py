@@ -48,6 +48,12 @@ def load_data():
             return create_test_data()
         
         df = pd.read_excel("DOUGH-PROD.xlsx", sheet_name="ML")
+        
+        # **FIX: Remove duplicate columns**
+        df.columns = pd.Index([str(col).strip() for col in df.columns])
+        # Keep only unique column names
+        df = df.loc[:, ~df.columns.duplicated()]
+        
         df.columns = df.columns.str.strip()
         
         if df.empty:
@@ -63,13 +69,15 @@ def load_data():
 
 def create_test_data():
     """Emergency test data - always works"""
-    return pd.DataFrame({
+    df = pd.DataFrame({
         'product_code': ['CB001', 'BG002', 'BR003', 'SF004'],
         'dough_code': ['DCB1', 'DBG1', 'DBR1', 'DSF1'],
         'product_desc': ['Ciabatta Loaf', 'Classic Baguette', 'Brioche Roll', 'Sourdough'],
         'cutwt_per_pc_g': [250, 180, 75, 200],
         'Prod_Status': ['Active', 'Active', 'Active', 'Active']
     })
+    st.info("🧪 Using test data (4 bakery products)")
+    return df
 
 # ------------------ LOAD DATA FIRST ------------------
 df = load_data()
@@ -97,7 +105,11 @@ if page == "📊 Dashboard":
     avg_weight = round(df["cutwt_per_pc_g"].mean(), 2) if "cutwt_per_pc_g" in df.columns else 0
     col3.metric("Avg Weight (g)", avg_weight)
     
-    st.dataframe(df, use_container_width=True)
+    # **FIX: Safe dataframe display**
+    if not df.empty:
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.write("No data to display")
 
 # ------------------ LOOKUP ------------------
 elif page == "🔍 Product Lookup":
@@ -116,11 +128,12 @@ elif page == "🔍 Product Lookup":
                 
                 with col1:
                     st.subheader(row.get("product_desc", "N/A"))
-                    # FIXED: Safe display - no str.strip() on non-strings
+                    # **FIX: Ultra-safe display**
                     for col in df.columns:
                         val = row[col]
-                        if pd.notna(val):  # Only check notna, no str.strip()
-                            st.write(f"**{col}:** {val}")
+                        if pd.notna(val):
+                            display_val = str(val) if pd.api.types.is_numeric_dtype(row[col]) else val
+                            st.write(f"**{col}:** {display_val}")
                 
                 with col2:
                     img = get_image_path(row.get("product_desc"))
@@ -144,10 +157,7 @@ elif page == "➕ Add Product":
         
         known_cols = ['product_code', 'dough_code', 'product_desc', 'cutwt_per_pc_g', 'Prod_Status']
         for col in known_cols:
-            if col in df.columns:
-                inputs[col] = st.text_input(col, placeholder=f"Enter {col}")
-            else:
-                inputs[col] = st.text_input(col)
+            inputs[col] = st.text_input(col, placeholder=f"Enter {col}")
         
         photo = st.file_uploader("🖼️ Product Image", type=["jpg", "jpeg", "png"])
         submitted = st.form_submit_button("➕ Add Product")
