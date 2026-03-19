@@ -139,11 +139,11 @@ elif page == "🔍 Product Lookup":
                             st.write(f"**{col}:** {display_val}")
                 
                with col2:
-    img = get_image_path(row.get("product_desc"))
-    if img and os.path.exists(img):
-        st.image(img, use_container_width=True)
-    else:
-        st.info("🖼️ No image found")
+                      img = get_image_path(row.get("product_desc"))
+                      if img and os.path.exists(img):
+                      st.image(img, use_container_width=True)
+                      else:
+                  st.info("🖼️ No image found")
 
         else:
             st.warning("❌ No products match your search")
