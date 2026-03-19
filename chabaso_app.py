@@ -43,9 +43,8 @@ def save_data(df):
 def load_data():
     """Load with full safety - NO CRASHES"""
     try:
-        # Quick file check
         if not os.path.exists("DOUGH-PROD.xlsx"):
-            st.warning("⚠️ **DOUGH-PROD.xlsx not found** - Using test data")
+            st.warning("⚠️ DOUGH-PROD.xlsx not found - Using test data")
             return create_test_data()
         
         df = pd.read_excel("DOUGH-PROD.xlsx", sheet_name="ML")
@@ -55,11 +54,11 @@ def load_data():
             st.warning("⚠️ Empty Excel - Using test data")
             return create_test_data()
             
-        st.success(f"✅ Loaded **{len(df)}** products")
+        st.success(f"✅ Loaded {len(df)} products")
         return df
         
     except Exception as e:
-        st.warning(f"⚠️ Load failed: {str(e)} - Using test data")
+        st.warning(f"⚠️ Load failed - Using test data")
         return create_test_data()
 
 def create_test_data():
@@ -89,7 +88,6 @@ page = st.sidebar.selectbox("Navigate", [
 if page == "📊 Dashboard":
     st.header("📊 Dashboard")
     
-    # SAFE METRICS - NO CRASHES
     col1, col2, col3 = st.columns(3)
     col1.metric("Total Products", len(df))
     
@@ -108,7 +106,6 @@ elif page == "🔍 Product Lookup":
     search = st.text_input("🔍 Search by Product Code or Dough Code")
     
     if search and not df.empty:
-        # Safe search
         mask1 = df["product_code"].astype(str).str.contains(search, case=False, na=False)
         mask2 = df["dough_code"].astype(str).str.contains(search, case=False, na=False)
         results = df[mask1 | mask2]
@@ -119,9 +116,10 @@ elif page == "🔍 Product Lookup":
                 
                 with col1:
                     st.subheader(row.get("product_desc", "N/A"))
+                    # FIXED: Safe display - no str.strip() on non-strings
                     for col in df.columns:
                         val = row[col]
-                        if pd.notna(val) and str(val).strip():
+                        if pd.notna(val):  # Only check notna, no str.strip()
                             st.write(f"**{col}:** {val}")
                 
                 with col2:
@@ -144,7 +142,6 @@ elif page == "➕ Add Product":
     with st.form("product_form"):
         inputs = {}
         
-        # Safe dynamic form
         known_cols = ['product_code', 'dough_code', 'product_desc', 'cutwt_per_pc_g', 'Prod_Status']
         for col in known_cols:
             if col in df.columns:
@@ -158,21 +155,20 @@ elif page == "➕ Add Product":
         if submitted:
             new_row = pd.DataFrame([inputs])
             
-            # Save image locally
             if photo and inputs.get("product_desc"):
                 ext = photo.name.split('.')[-1].lower()
-                if ext == "jpeg": ext = "jpg"
+                if ext == "jpeg": 
+                    ext = "jpg"
                 filepath = os.path.join(IMAGE_FOLDER, f"{inputs['product_desc']}.{ext}")
                 with open(filepath, "wb") as f:
                     f.write(photo.getbuffer())
                 st.success(f"🖼️ Image saved!")
             
-            # Update data (local only)
             if not df.empty:
                 updated_df = pd.concat([df, new_row], ignore_index=True)
             else:
                 updated_df = new_row
             
             save_data(updated_df)
-            st.success("✅ Product added! (Refresh to see changes)")
+            st.success("✅ Product added!")
             st.rerun()
