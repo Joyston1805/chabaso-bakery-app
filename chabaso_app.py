@@ -30,24 +30,32 @@ def get_image_path(product_desc):
             return path
     return None
 
-# ------------------ LOAD DATA ------------------
+# ------------------ LOAD DATA -----------------
+
 @st.cache_data
 def load_data():
-    if not os.path.exists("DOUGH-PROD.xlsx"):
+    # DEBUG: Show current directory
+    current_dir = os.getcwd()
+    st.write(f"📁 Current directory: `{current_dir}`")
+    
+    # DEBUG: List ALL files
+    all_files = os.listdir('.')
+    st.write("📋 All files in repo root:")
+    for f in all_files:
+        st.write(f"  - {f}")
+    
+    # Check specific file
+    file_exists = os.path.exists("DOUGH-PROD.xlsx")
+    st.write(f"✅ DOUGH-PROD.xlsx exists: {file_exists}")
+    
+    if not file_exists:
+        st.error("❌ File missing! Check GitHub repo structure.")
         return pd.DataFrame()
-
+    
     df = pd.read_excel("DOUGH-PROD.xlsx", sheet_name="ML")
-
-    # Clean column names (strip spaces)
-    df.columns = df.columns.str.strip()
-
+    st.success(f"✅ Loaded {len(df)} rows!")
     return df
 
-def save_data(df):
-    with pd.ExcelWriter("DOUGH-PROD.xlsx", engine="openpyxl", mode="w") as writer:
-        df.to_excel(writer, sheet_name="ML", index=False)
-
-df = load_data()
 
 # ------------------ HEADER ------------------
 st.markdown('<h1 class="main-header">🍞 CHABASO Bakery Pro</h1>', unsafe_allow_html=True)
